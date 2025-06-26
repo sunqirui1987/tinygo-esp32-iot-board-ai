@@ -1,0 +1,2 @@
+get_idf
+tinygo flash -target=esp32-coreboard-v2 -port=/dev/cu.usbserial-210 .
