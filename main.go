@@ -9,30 +9,30 @@ import (
 	"tinygo.org/x/drivers/ssd1306"
 )
 
-// 定义引脚
+// Pin definitions
 var (
-	// LED指示灯
+	// LED indicator
 	statusLED = machine.GPIO2
 
-	// 启动按钮 (BOOT BUTTON)
-	bootButton = machine.GPIO34 // A6引脚
+	// Boot button (BOOT BUTTON)
+	bootButton = machine.GPIO34 // A6 pin
 
-	// OLED显示屏 I2C引脚
-	sclPin = machine.GPIO22 // OLED SCL引脚
-	sdaPin = machine.GPIO21 // OLED SDA引脚
+	// OLED display I2C pins
+	sclPin = machine.GPIO22 // OLED SCL pin
+	sdaPin = machine.GPIO21 // OLED SDA pin
 
-	// 麦克风引脚 (INMP441)
-	micDINPin = machine.GPIO27 // 麦克风 DIN引脚
-	micWSPin  = machine.GPIO26 // 麦克风 WS引脚
-	micSCKPin = machine.GPIO25 // 麦克风 SCK引脚
+	// Microphone pins (INMP441)
+	micDINPin = machine.GPIO27 // Microphone DIN pin
+	micWSPin  = machine.GPIO26 // Microphone WS pin
+	micSCKPin = machine.GPIO25 // Microphone SCK pin
 
-	// 扬声器引脚
-	speakerDOUTPin = machine.GPIO23 // 扬声器 DOUT引脚
-	speakerBCLKPin = machine.GPIO33 // 扬声器 BCLK引脚
-	speakerWSPin   = machine.GPIO32 // 扬声器 WS引脚
+	// Speaker pins
+	speakerDOUTPin = machine.GPIO23 // Speaker DOUT pin
+	speakerBCLKPin = machine.GPIO33 // Speaker BCLK pin
+	speakerWSPin   = machine.GPIO32 // Speaker WS pin
 )
 
-// 系统状态
+// System state
 type SystemState int
 
 const (
@@ -42,43 +42,43 @@ const (
 	StateProcessing
 )
 
-// 音频配置
+// Audio configuration
 const (
-	SAMPLE_RATE     = 16000 // 16kHz采样率
-	BITS_PER_SAMPLE = 16    // 16位采样
-	MAX_RECORD_TIME = 10    // 最大录音时间（秒）
-	BUFFER_SIZE     = 1024  // 音频缓冲区大小
+	SAMPLE_RATE     = 16000 // 16kHz sample rate
+	BITS_PER_SAMPLE = 16    // 16-bit sampling
+	MAX_RECORD_TIME = 10    // Maximum recording time (seconds)
+	BUFFER_SIZE     = 1024  // Audio buffer size
 )
 
-// 全局变量
+// Global variables
 var (
 	currentState     = StateIdle
-	recordingTime    = 0.0 // 录音时长（秒）
-	playingTime      = 0.0 // 播放时长（秒）
+	recordingTime    = 0.0 // Recording duration (seconds)
+	playingTime      = 0.0 // Playing duration (seconds)
 	display          ssd1306.Device
 	oledInitialized  = false
-	audioBuffer      = make([]int16, SAMPLE_RATE*MAX_RECORD_TIME) // 音频缓冲区
-	recordedSamples  = 0                                          // 已录制的样本数
-	playbackPosition = 0                                          // 播放位置
+	audioBuffer      = make([]int16, SAMPLE_RATE*MAX_RECORD_TIME) // Audio buffer
+	recordedSamples  = 0                                          // Recorded samples count
+	playbackPosition = 0                                          // Playback position
 	i2sInitialized   = false
 )
 
 func main() {
-	fmt.Println("ESP32 录音播放系统启动中...")
+	fmt.Println("ESP32 Recording Playback System Starting...")
 
-	// 初始化硬件
+	// Initialize hardware
 	initHardware()
 
-	// 显示启动信息
-	displayMessage("ESP32", "录音系统就绪")
+	// Display startup information
+	displayMessage("ESP32", "Audio System Ready")
 	time.Sleep(2 * time.Second)
 
-	// 主循环
+	// Main loop
 	for {
-		// 检查按键状态
+		// Check button status
 		checkButtonPress()
 
-		// 根据当前状态执行相应操作
+		// Execute corresponding operations based on current state
 		switch currentState {
 		case StateIdle:
 			handleIdleState()
@@ -94,79 +94,79 @@ func main() {
 	}
 }
 
-// 初始化硬件
+// Initialize hardware
 func initHardware() {
-	fmt.Println("初始化硬件...")
+	fmt.Println("Initializing hardware...")
 
-	// 配置LED
+	// Configure LED
 	statusLED.Configure(machine.PinConfig{Mode: machine.PinOutput})
 	statusLED.Low()
 
-	// 配置按键
+	// Configure button
 	bootButton.Configure(machine.PinConfig{Mode: machine.PinInput})
 
-	// 初始化OLED显示屏
+	// Initialize OLED display
 	initOLED()
 
-	// 初始化I2S音频接口
+	// Initialize I2S audio interface
 	initI2S()
 
-	fmt.Println("硬件初始化完成")
+	fmt.Println("Hardware initialization completed")
 }
 
-// 初始化OLED显示屏
+// Initialize OLED display
 func initOLED() {
-	fmt.Println("初始化OLED显示屏...")
+	fmt.Println("Initializing OLED display...")
 
-	// 配置I2C
+	// Configure I2C
 	machine.I2C0.Configure(machine.I2CConfig{
 		SCL:       sclPin,
 		SDA:       sdaPin,
 		Frequency: 400000, // 400kHz
 	})
 
-	// 创建SSD1306设备实例
+	// Create SSD1306 device instance
 	display = ssd1306.NewI2C(machine.I2C0)
 
-	// 配置显示屏
+	// Configure display
 	display.Configure(ssd1306.Config{
 		Address: ssd1306.Address_128_32, // 0x3C
 		Width:   128,
 		Height:  64,
 	})
 
-	// 清空显示
+	// Clear display
 	display.ClearDisplay()
 	oledInitialized = true
-	fmt.Println("OLED显示屏初始化完成")
+	fmt.Println("OLED display initialization completed")
 }
 
-// 初始化I2S音频接口
+// Initialize I2S audio interface
 func initI2S() {
-	fmt.Println("初始化I2S音频接口...")
+	fmt.Println("Initializing I2S audio interface...")
 
-	// 配置麦克风引脚
+	// Configure microphone pins
 	micDINPin.Configure(machine.PinConfig{Mode: machine.PinInput})
 	micWSPin.Configure(machine.PinConfig{Mode: machine.PinOutput})
 	micSCKPin.Configure(machine.PinConfig{Mode: machine.PinOutput})
 
-	// 配置扬声器引脚
+	// Configure speaker pins
 	speakerDOUTPin.Configure(machine.PinConfig{Mode: machine.PinOutput})
 	speakerBCLKPin.Configure(machine.PinConfig{Mode: machine.PinOutput})
 	speakerWSPin.Configure(machine.PinConfig{Mode: machine.PinOutput})
 
-	// 初始化I2S配置（这里是简化版本，实际需要根据具体硬件配置）
+	// Initialize I2S configuration (simplified version, actual implementation needs specific hardware configuration)
 	i2sInitialized = true
-	fmt.Println("I2S音频接口初始化完成")
+	fmt.Println("I2S audio interface initialization completed")
 }
 
-// 检查按键按下
+// Check button press
 func checkButtonPress() {
 	if !bootButton.Get() {
-		time.Sleep(50 * time.Millisecond) // 消抖
+		time.Sleep(50 * time.Millisecond) // Debounce
 		if !bootButton.Get() {
 			handleButtonPress()
-			// 等待按键释放
+			// Wait for button release
 			for !bootButton.Get() {
 				time.Sleep(10 * time.Millisecond)
 			}
@@ -174,35 +174,35 @@ func checkButtonPress() {
 	}
 }
 
-// 处理按键按下事件
+// Handle button press event
 func handleButtonPress() {
-	fmt.Println("检测到BOOT按键按下")
+	fmt.Println("BOOT button press detected")
 
-	// 播放按键确认音
+	// Play button confirmation sound
 	playBeep(1000, 100*time.Millisecond)
 
 	switch currentState {
 	case StateIdle:
-		// 开始录音
+		// Start recording
 		startRecording()
 
 	case StateRecording:
-		// 停止录音
+		// Stop recording
 		stopRecording()
 
 	case StatePlaying:
-		// 停止播放
+		// Stop playing
 		stopPlaying()
 
 	case StateProcessing:
-		// 取消处理
+		// Cancel processing
 		currentState = StateIdle
-		displayMessage("系统", "已取消")
+		displayMessage("System", "Cancelled")
 		statusLED.Low()
 	}
 }
 
-// 开始录音
+// Start recording
 func startRecording() {
 	if !i2sInitialized {
 		return
@@ -214,10 +214,10 @@ func startRecording() {
 	statusLED.High()
 
 	displayRecordingStatus()
-	fmt.Println("开始录音...")
+	fmt.Println("Recording started...")
 }
 
-// 停止录音
+// Stop recording
 func stopRecording() {
 	if currentState != StateRecording {
 		return
@@ -226,18 +226,18 @@ func stopRecording() {
 	currentState = StateProcessing
 	statusLED.Low()
 
-	fmt.Printf("录音完成，时长: %.1f秒\n", recordingTime)
-	displayMessage("录音完成", fmt.Sprintf("%.1fs 按键播放", recordingTime))
+	fmt.Printf("Recording completed, duration: %.1f seconds\n", recordingTime)
+	displayMessage("Recording Done", fmt.Sprintf("%.1fs Press to play", recordingTime))
 
-	// 短暂处理后进入待机状态
+	// Brief processing then enter idle state
 	time.Sleep(1 * time.Second)
 	currentState = StateIdle
 }
 
-// 开始播放
+// Start playing
 func startPlaying() {
 	if recordedSamples == 0 {
-		displayMessage("错误", "无录音文件")
+		displayMessage("Error", "No recording")
 		return
 	}
 
@@ -247,10 +247,10 @@ func startPlaying() {
 	statusLED.High()
 
 	displayPlayingStatus()
-	fmt.Println("开始播放录音...")
+	fmt.Println("Playing recording...")
 }
 
-// 停止播放
+// Stop playing
 func stopPlaying() {
 	if currentState != StatePlaying {
 		return
@@ -259,87 +259,87 @@ func stopPlaying() {
 	currentState = StateIdle
 	statusLED.Low()
 
-	fmt.Println("播放停止")
-	displayMessage("播放停止", "按键重新播放")
+	fmt.Println("Playback stopped")
+	displayMessage("Playback Stop", "Press to replay")
 }
 
-// 处理待机状态
+// Handle idle state
 func handleIdleState() {
-	// LED慢闪表示待机
+	// LED slow blink indicates idle
 	statusLED.High()
 	time.Sleep(100 * time.Millisecond)
 	statusLED.Low()
 	time.Sleep(1900 * time.Millisecond)
 
-	// 显示待机信息
+	// Display idle information
 	if recordedSamples > 0 {
-		displayMessage("就绪", "按键播放录音")
+		displayMessage("Ready", "Press to play")
 	} else {
-		displayMessage("就绪", "按键开始录音")
+		displayMessage("Ready", "Press to record")
 	}
 }
 
-// 处理录音状态
+// Handle recording state
 func handleRecordingState() {
-	// LED快闪表示录音中
+	// LED fast blink indicates recording
 	statusLED.High()
 	time.Sleep(200 * time.Millisecond)
 	statusLED.Low()
 	time.Sleep(200 * time.Millisecond)
 
-	// 更新录音时间
-	recordingTime += 0.4 // 每400ms更新一次
+	// Update recording time
+	recordingTime += 0.4 // Update every 400ms
 
-	// 模拟录音数据采集
+	// Simulate recording data collection
 	if i2sInitialized {
-		// 这里应该从I2S接口读取实际的音频数据
-		// 现在用模拟数据代替
-		samplesThisCycle := int(SAMPLE_RATE * 0.4) // 400ms的样本数
+		// Should read actual audio data from I2S interface here
+		// Now using simulated data instead
+		samplesThisCycle := int(SAMPLE_RATE * 0.4) // 400ms worth of samples
 		for i := 0; i < samplesThisCycle && recordedSamples < len(audioBuffer); i++ {
-			// 模拟音频数据（实际应该从麦克风读取）
+			// Simulated audio data (should read from microphone in reality)
 			audioBuffer[recordedSamples] = int16((recordedSamples % 1000) - 500)
 			recordedSamples++
 		}
 	}
 
-	// 更新显示
+	// Update display
 	displayRecordingStatus()
 
-	// 检查是否达到最大录音时间
+	// Check if maximum recording time is reached
 	if recordingTime >= MAX_RECORD_TIME {
 		stopRecording()
 	}
 }
 
-// 处理播放状态
+// Handle playing state
 func handlePlayingState() {
-	// LED常亮表示播放中
+	// LED solid indicates playing
 	statusLED.High()
 
-	// 更新播放时间
-	playingTime += 0.1 // 每100ms更新一次
+	// Update playing time
+	playingTime += 0.1 // Update every 100ms
 
-	// 模拟播放数据输出
+	// Simulate playback data output
 	if i2sInitialized {
-		// 这里应该向I2S接口输出音频数据
-		// 现在用模拟播放代替
-		samplesThisCycle := int(SAMPLE_RATE * 0.1) // 100ms的样本数
+		// Should output audio data to I2S interface here
+		// Now using simulated playback instead
+		samplesThisCycle := int(SAMPLE_RATE * 0.1) // 100ms worth of samples
 		playbackPosition += samplesThisCycle
 	}
 
-	// 更新显示
+	// Update display
 	displayPlayingStatus()
 
-	// 检查是否播放完成
+	// Check if playback is complete
 	totalPlayTime := float64(recordedSamples) / SAMPLE_RATE
 	if playingTime >= totalPlayTime {
 		stopPlaying()
 	}
 }
 
-// 处理处理状态
+// Handle processing state
 func handleProcessingState() {
-	// LED闪烁表示处理中
+	// LED blink indicates processing
 	for i := 0; i < 3; i++ {
 		statusLED.High()
 		time.Sleep(100 * time.Millisecond)
@@ -348,20 +348,20 @@ func handleProcessingState() {
 	}
 }
 
-// 显示录音状态
+// Display recording status
 func displayRecordingStatus() {
 	if !oledInitialized {
 		return
 	}
 
 	display.ClearBuffer()
-	drawSimpleText("录音中...", 0, 0)
-	drawSimpleText(fmt.Sprintf("时长: %.1fs", recordingTime), 0, 20)
-	drawSimpleText(fmt.Sprintf("最大: %ds", MAX_RECORD_TIME), 0, 40)
+	drawSimpleText("Recording...", 0, 0)
+	drawSimpleText(fmt.Sprintf("Time: %.1fs", recordingTime), 0, 20)
+	drawSimpleText(fmt.Sprintf("Max: %ds", MAX_RECORD_TIME), 0, 40)
 	display.Display()
 }
 
-// 显示播放状态
+// Display playing status
 func displayPlayingStatus() {
 	if !oledInitialized {
 		return
@@ -369,10 +369,10 @@ func displayPlayingStatus() {
 
 	totalTime := float64(recordedSamples) / SAMPLE_RATE
 	display.ClearBuffer()
-	drawSimpleText("播放中...", 0, 0)
+	drawSimpleText("> PLAY", 0, 0)
 	drawSimpleText(fmt.Sprintf("%.1f/%.1fs", playingTime, totalTime), 0, 20)
 
-	// 显示进度条
+	// Display progress bar
 	progress := int(playingTime / totalTime * 120)
 	if progress > 120 {
 		progress = 120
@@ -384,7 +384,7 @@ func displayPlayingStatus() {
 	display.Display()
 }
 
-// 显示消息到屏幕
+// Display message to screen
 func displayMessage(title, message string) {
 	if !oledInitialized {
 		return
@@ -395,16 +395,16 @@ func displayMessage(title, message string) {
 	drawSimpleText(message, 0, 20)
 	display.Display()
 
-	fmt.Printf("[显示] %s: %s\n", title, message)
+	fmt.Printf("[Display] %s: %s\n", title, message)
 }
 
-// 绘制简单文本（使用像素点阵）
+// Draw simple text (using pixel matrix)
 func drawSimpleText(text string, x, y int16) {
-	charWidth := int16(6) // 包含间距
+	charWidth := int16(6) // Including spacing
 	currentX := x
 
 	for _, char := range text {
-		if currentX > 122 { // 防止超出屏幕边界
+		if currentX > 122 { // Prevent exceeding screen boundaries
 			break
 		}
 		drawChar5x7(char, currentX, y)
@@ -412,12 +412,12 @@ func drawSimpleText(text string, x, y int16) {
 	}
 }
 
-// 绘制5x7像素字符 - 优化后的完整字符集
+// Draw 5x7 pixel character - optimized complete character set
 func drawChar5x7(char rune, x, y int16) {
 	var pattern []uint8
 
 	switch char {
-	// 大写字母
+	// Uppercase letters
 	case 'A':
 		pattern = []uint8{0x7C, 0x12, 0x11, 0x12, 0x7C}
 	case 'B':
@@ -471,7 +471,7 @@ func drawChar5x7(char rune, x, y int16) {
 	case 'Z':
 		pattern = []uint8{0x61, 0x51, 0x49, 0x45, 0x43}
 
-	// 小写字母
+	// Lowercase letters
 	case 'a':
 		pattern = []uint8{0x20, 0x54, 0x54, 0x54, 0x78}
 	case 'b':
@@ -525,7 +525,7 @@ func drawChar5x7(char rune, x, y int16) {
 	case 'z':
 		pattern = []uint8{0x44, 0x64, 0x54, 0x4C, 0x44}
 
-	// 数字
+	// Numbers
 	case '0':
 		pattern = []uint8{0x3E, 0x51, 0x49, 0x45, 0x3E}
 	case '1':
@@ -547,7 +547,7 @@ func drawChar5x7(char rune, x, y int16) {
 	case '9':
 		pattern = []uint8{0x06, 0x49, 0x49, 0x29, 0x1E}
 
-	// 特殊字符
+	// Special characters
 	case ' ':
 		pattern = []uint8{0x00, 0x00, 0x00, 0x00, 0x00}
 	case '.':
@@ -586,13 +586,15 @@ func drawChar5x7(char rune, x, y int16) {
 		pattern = []uint8{0x00, 0x08, 0x36, 0x41, 0x00}
 	case '}':
 		pattern = []uint8{0x00, 0x41, 0x36, 0x08, 0x00}
+	case '>':
+		pattern = []uint8{0x08, 0x14, 0x22, 0x41, 0x00}
 
 	default:
-		// 未知字符显示为方块
+		// Unknown character displays as block
 		pattern = []uint8{0x7F, 0x41, 0x41, 0x41, 0x7F}
 	}
 
-	// 绘制字符像素
+	// Draw character pixels
 	for col := 0; col < 5; col++ {
 		colData := pattern[col]
 		for row := 0; row < 7; row++ {
@@ -603,10 +605,10 @@ func drawChar5x7(char rune, x, y int16) {
 	}
 }
 
-// 播放蜂鸣音 - 补充缺失的函数
+// Play beep sound - supplementary missing function
 func playBeep(frequency int, duration time.Duration) {
-	// 简单的蜂鸣实现 - 使用扬声器引脚
-	// 这里只是一个示例，实际实现需要PWM或其他音频技术
+	// Simple beep implementation - using speaker pin
+	// This is just an example, actual implementation needs PWM or other audio technology
 	period := time.Duration(1000000/frequency) * time.Microsecond
 	half := period / 2
 
@@ -619,7 +621,7 @@ func playBeep(frequency int, duration time.Duration) {
 	}
 }
 
-// 显示启动画面
+// Display boot screen
 func showBootScreen() {
 	if !oledInitialized {
 		return
@@ -632,7 +634,7 @@ func showBootScreen() {
 	display.Display()
 }
 
-// 显示状态信息
+// Display status information
 func showStatus(state string) {
 	if !oledInitialized {
 		return
