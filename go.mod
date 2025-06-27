@@ -1,6 +1,10 @@
 module esp32
 
-go 1.22.6
+go 1.22.1
+
+toolchain go1.24.4
+
+// CGO_ENABLED=1 for I2S support
 
 require tinygo.org/x/drivers v0.32.0
 

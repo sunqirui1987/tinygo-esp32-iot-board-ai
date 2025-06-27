@@ -1,10 +1,12 @@
 package handlers
 
 import (
-	"time"
+	"esp32/audio"
+	"esp32/display"
 	"esp32/hardware"
 	"esp32/system"
-	"esp32/display"
+	"fmt"
+	"time"
 )
 
 // Handle idle state
@@ -34,11 +36,15 @@ func HandleRecordingState() {
 	// Update recording time
 	system.RecordingTime += 0.4 // Update every 400ms
 
-	// Simulate recording data collection
-	if system.I2sInitialized {
-		samplesThisCycle := int(hardware.SAMPLE_RATE * 0.4) // 400ms worth of samples
-		for i := 0; i < samplesThisCycle && system.RecordedSamples < len(system.AudioBuffer); i++ {
-			system.AudioBuffer[system.RecordedSamples] = int16((system.RecordedSamples % 1000) - 500)
+	// 读取真实的I2S音频数据
+	buffer := make([]int16, 256)                       // 每次读取256个样本
+	samplesRead, err := audio.ReadSamples(buffer, 100) // 100ms超时
+	if err != nil {
+		fmt.Printf("I2S read error: %v\n", err)
+	} else if samplesRead > 0 {
+		// 将读取的样本添加到音频缓冲区
+		for i := 0; i < samplesRead && system.RecordedSamples < len(system.AudioBuffer); i++ {
+			system.AudioBuffer[system.RecordedSamples] = buffer[i]
 			system.RecordedSamples++
 		}
 	}
@@ -48,7 +54,7 @@ func HandleRecordingState() {
 
 	// Check if maximum recording time is reached
 	if system.RecordingTime >= hardware.MAX_RECORD_TIME {
-		// Stop recording (需要导入audio包)
+		audio.StopRecording()
 	}
 }
 
@@ -72,7 +78,7 @@ func HandlePlayingState() {
 	// Check if playback is complete
 	totalPlayTime := float64(system.RecordedSamples) / hardware.SAMPLE_RATE
 	if system.PlayingTime >= totalPlayTime {
-		// Stop playing (需要导入audio包)
+		audio.StopPlaying()
 	}
 }
 

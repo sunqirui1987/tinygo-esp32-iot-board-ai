@@ -1,12 +1,13 @@
 package audio
 
 import (
+	"esp32/display"
+	"esp32/hardware"
+	"esp32/i2s"
+	"esp32/system"
 	"fmt"
 	"machine"
 	"time"
-	"esp32/hardware"
-	"esp32/system"
-	"esp32/display"
 )
 
 // Initialize I2S audio interface
@@ -23,7 +24,24 @@ func InitI2S() {
 	hardware.SpeakerBCLKPin.Configure(machine.PinConfig{Mode: machine.PinOutput})
 	hardware.SpeakerWSPin.Configure(machine.PinConfig{Mode: machine.PinOutput})
 
-	// Initialize I2S configuration
+	// Initialize I2S with INMP441 configuration
+	config := i2s.Config{
+		SampleRate:    16000,                   // 16kHz采样率
+		BitsPerSample: 32,                      // INMP441输出32位数据
+		DMABufCount:   4,                       // DMA缓冲区数量
+		DMABufLen:     1024,                    // 每个缓冲区长度
+		WSPin:         int(hardware.MicWSPin),  // GPIO26
+		SCKPin:        int(hardware.MicSCKPin), // GPIO25
+		DINPin:        int(hardware.MicDINPin), // GPIO27
+	}
+
+	err := i2s.Init(config)
+	if err != nil {
+		fmt.Printf("I2S initialization failed: %v\n", err)
+		system.I2sInitialized = false
+		return
+	}
+
 	system.I2sInitialized = true
 	fmt.Println("I2S audio interface initialization completed")
 }
@@ -31,6 +49,7 @@ func InitI2S() {
 // Start recording
 func StartRecording() {
 	if !system.I2sInitialized {
+		fmt.Println("I2S not initialized")
 		return
 	}
 
@@ -89,6 +108,15 @@ func StopPlaying() {
 	display.DisplayMessage("Playback Stop", "Press to replay")
 }
 
+// Read audio samples from I2S
+func ReadSamples(buffer []int16, timeoutMs int) (int, error) {
+	if !system.I2sInitialized {
+		return 0, fmt.Errorf("I2S not initialized")
+	}
+
+	return i2s.Read(buffer, timeoutMs)
+}
+
 // Play beep sound
 func PlayBeep(frequency int, duration time.Duration) {
 	period := time.Duration(1000000/frequency) * time.Microsecond
@@ -100,5 +128,16 @@ func PlayBeep(frequency int, duration time.Duration) {
 		time.Sleep(half)
 		hardware.SpeakerDOUTPin.Low()
 		time.Sleep(half)
+	}
+}
+
+// Cleanup I2S resources
+func CleanupI2S() {
+	if system.I2sInitialized {
+		err := i2s.Deinit()
+		if err != nil {
+			fmt.Printf("I2S cleanup failed: %v\n", err)
+		}
+		system.I2sInitialized = false
 	}
 }
