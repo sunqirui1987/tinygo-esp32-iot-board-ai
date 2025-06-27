@@ -1,4 +1,4 @@
-module hello-world
+module esp32
 
 go 1.22.6
 
